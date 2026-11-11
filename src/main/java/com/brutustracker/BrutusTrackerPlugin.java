@@ -5,9 +5,11 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import javax.inject.Inject;
 import net.runelite.api.Client;
+import net.runelite.api.ChatMessageType;
 import net.runelite.api.GameState;
 import net.runelite.api.NPC;
 import net.runelite.api.events.ActorDeath;
+import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.HitsplatApplied;
 import net.runelite.api.events.NpcDespawned;
@@ -47,7 +49,7 @@ public class BrutusTrackerPlugin extends Plugin
 	@Override
 	protected void startUp()
 	{
-		loadPersonalBests();
+		loadStoredStats();
 		overlayManager.add(overlay);
 	}
 
@@ -81,8 +83,23 @@ public class BrutusTrackerPlugin extends Plugin
 	{
 		if (event.getGameState() == GameState.LOGGED_IN)
 		{
-			loadPersonalBests();
+			loadStoredStats();
 		}
+	}
+
+	@Subscribe
+	public void onChatMessage(ChatMessage event)
+	{
+		if (event.getType() != ChatMessageType.GAMEMESSAGE && event.getType() != ChatMessageType.SPAM)
+		{
+			return;
+		}
+		KillCountMessage.parse(event.getMessage()).ifPresent(kc ->
+		{
+			session.setAllTimeKillCount(kc.getVariant(), OptionalInt.of(kc.getKillCount()));
+			configManager.setRSProfileConfiguration(
+				BrutusTrackerConfig.GROUP, kc.getVariant().getKcConfigKey(), kc.getKillCount());
+		});
 	}
 
 	@Subscribe
@@ -146,13 +163,16 @@ public class BrutusTrackerPlugin extends Plugin
 		return BrutusVariant.fromNpcId(npc.getId());
 	}
 
-	private void loadPersonalBests()
+	private void loadStoredStats()
 	{
 		for (BrutusVariant variant : BrutusVariant.values())
 		{
 			Integer ticks = configManager.getRSProfileConfiguration(
 				BrutusTrackerConfig.GROUP, variant.getPbConfigKey(), Integer.class);
 			session.setPersonalBest(variant, ticks == null ? OptionalInt.empty() : OptionalInt.of(ticks));
+			Integer kc = configManager.getRSProfileConfiguration(
+				BrutusTrackerConfig.GROUP, variant.getKcConfigKey(), Integer.class);
+			session.setAllTimeKillCount(variant, kc == null ? OptionalInt.empty() : OptionalInt.of(kc));
 		}
 	}
 }

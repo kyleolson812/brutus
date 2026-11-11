@@ -47,6 +47,8 @@ class BrutusTrackerOverlay extends OverlayPanel
 			}
 			panelComponent.getChildren().add(TitleComponent.builder().text(variant.getDisplayName()).build());
 			addLine("Kills", Integer.toString(kills));
+			OptionalInt allTime = session.getAllTimeKillCount(variant);
+			addLine("KC (all time)", allTime.isPresent() ? Integer.toString(allTime.getAsInt()) : NO_TIME);
 			addLine("Last", formatTicks(session.getLastKillTicks(variant)));
 			addLine("Best (session)", formatTicks(session.getBestTicks(variant)));
 			addLine("PB", formatTicks(session.getPersonalBest(variant)));

@@ -28,6 +28,7 @@ public class BrutusSession
 		private OptionalInt lastKillTicks = OptionalInt.empty();
 		private OptionalInt bestTicks = OptionalInt.empty();
 		private OptionalInt pbTicks = OptionalInt.empty();
+		private OptionalInt allTimeKc = OptionalInt.empty();
 	}
 
 	private final Map<BrutusVariant, Stats> stats = new EnumMap<>(BrutusVariant.class);
@@ -91,6 +92,16 @@ public class BrutusSession
 	public void setPersonalBest(BrutusVariant variant, OptionalInt ticks)
 	{
 		stats.get(variant).pbTicks = ticks;
+	}
+
+	public void setAllTimeKillCount(BrutusVariant variant, OptionalInt kc)
+	{
+		stats.get(variant).allTimeKc = kc;
+	}
+
+	public OptionalInt getAllTimeKillCount(BrutusVariant variant)
+	{
+		return stats.get(variant).allTimeKc;
 	}
 
 	public boolean isFightInProgress()

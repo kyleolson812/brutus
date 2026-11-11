@@ -152,4 +152,20 @@ public class BrutusSessionTest
 		assertEquals(Optional.of(DEMONIC), BrutusVariant.fromNpcId(NpcID.COWBOSS_HARDMODE));
 		assertEquals(Optional.empty(), BrutusVariant.fromNpcId(-1));
 	}
+
+	@Test
+	public void allTimeKillCountIsEmptyUntilSetThenReplacedNotIncremented()
+	{
+		BrutusSession session = new BrutusSession();
+		assertEquals(OptionalInt.empty(), session.getAllTimeKillCount(NORMAL));
+
+		session.setAllTimeKillCount(NORMAL, OptionalInt.of(10));
+		session.onBrutusDamaged(NORMAL, 0);
+		session.onBrutusDied(NORMAL, 40);
+		assertEquals(OptionalInt.of(10), session.getAllTimeKillCount(NORMAL));
+
+		session.setAllTimeKillCount(NORMAL, OptionalInt.of(11));
+		assertEquals(OptionalInt.of(11), session.getAllTimeKillCount(NORMAL));
+		assertEquals(OptionalInt.empty(), session.getAllTimeKillCount(DEMONIC));
+	}
 }
