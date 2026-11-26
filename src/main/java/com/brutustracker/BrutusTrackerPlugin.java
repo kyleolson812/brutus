@@ -24,7 +24,7 @@ import net.runelite.client.ui.overlay.OverlayManager;
 
 @PluginDescriptor(
 	name = "Brutus Tracker",
-	description = "Session kill stats for Brutus and Demonic Brutus",
+	description = "Kill count, kill times, personal bests and kills per hour for Brutus and Demonic Brutus",
 	tags = {"brutus", "cow", "boss", "kc", "tracker"}
 )
 public class BrutusTrackerPlugin extends Plugin
