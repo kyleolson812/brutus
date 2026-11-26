@@ -184,6 +184,10 @@ public class BrutusTrackerPlugin extends Plugin
 
 	private void adoptBrutusOnScreen()
 	{
+		if (client.getGameState() != GameState.LOGGED_IN || client.getTopLevelWorldView() == null)
+		{
+			return;
+		}
 		for (NPC npc : client.getTopLevelWorldView().npcs())
 		{
 			if (BrutusVariant.fromNpcId(npc.getId()).isPresent())
