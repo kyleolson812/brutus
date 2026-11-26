@@ -11,9 +11,11 @@ import net.runelite.api.NPC;
 import net.runelite.api.events.ActorDeath;
 import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.GameStateChanged;
+import net.runelite.api.events.GameTick;
 import net.runelite.api.events.HitsplatApplied;
 import net.runelite.api.events.NpcDespawned;
 import net.runelite.api.events.NpcSpawned;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
@@ -27,11 +29,13 @@ import net.runelite.client.ui.overlay.OverlayManager;
 )
 public class BrutusTrackerPlugin extends Plugin
 {
-	private static final int RECENT_TICKS = 100;
-	private static final int NEVER_SEEN = Integer.MIN_VALUE;
+	private static final long NO_ACCOUNT = -1;
 
 	@Inject
 	private Client client;
+
+	@Inject
+	private ClientThread clientThread;
 
 	@Inject
 	private ConfigManager configManager;
@@ -42,15 +46,19 @@ public class BrutusTrackerPlugin extends Plugin
 	@Inject
 	private BrutusTrackerOverlay overlay;
 
-	private final BrutusSession session = new BrutusSession();
+	// The overlay reads this from the render thread.
+	private volatile BrutusSession session = new BrutusSession();
 	private NPC brutus;
-	private int lastSeenTick = NEVER_SEEN;
+	private long lastAccountHash = NO_ACCOUNT;
 
 	@Override
 	protected void startUp()
 	{
+		session = new BrutusSession();
+		lastAccountHash = client.getAccountHash();
 		loadStoredStats();
 		overlayManager.add(overlay);
+		clientThread.invokeLater(this::adoptBrutusOnScreen);
 	}
 
 	@Override
@@ -58,8 +66,7 @@ public class BrutusTrackerPlugin extends Plugin
 	{
 		overlayManager.remove(overlay);
 		brutus = null;
-		lastSeenTick = NEVER_SEEN;
-		session.onBrutusDespawnedAlive();
+		session.abandonFight();
 	}
 
 	@Provides
@@ -75,14 +82,35 @@ public class BrutusTrackerPlugin extends Plugin
 
 	boolean isRecentlyActive()
 	{
-		return session.isFightInProgress() || client.getTickCount() - lastSeenTick <= RECENT_TICKS;
+		return session.isRecentlyActive();
+	}
+
+	@Subscribe
+	public void onGameTick(GameTick event)
+	{
+		session.onTick();
 	}
 
 	@Subscribe
 	public void onGameStateChanged(GameStateChanged event)
 	{
-		if (event.getGameState() == GameState.LOGGED_IN)
+		GameState state = event.getGameState();
+		if (state == GameState.LOGIN_SCREEN || state == GameState.HOPPING)
 		{
+			brutus = null;
+			session.abandonFight();
+		}
+		else if (state == GameState.LOGGED_IN)
+		{
+			long accountHash = client.getAccountHash();
+			if (accountHash != NO_ACCOUNT)
+			{
+				if (lastAccountHash != NO_ACCOUNT && accountHash != lastAccountHash)
+				{
+					session = new BrutusSession();
+				}
+				lastAccountHash = accountHash;
+			}
 			loadStoredStats();
 		}
 	}
@@ -109,7 +137,7 @@ public class BrutusTrackerPlugin extends Plugin
 		if (BrutusVariant.fromNpcId(npc.getId()).isPresent())
 		{
 			brutus = npc;
-			lastSeenTick = client.getTickCount();
+			session.markSeen();
 		}
 	}
 
@@ -120,9 +148,7 @@ public class BrutusTrackerPlugin extends Plugin
 		{
 			return;
 		}
-		int tick = client.getTickCount();
-		lastSeenTick = tick;
-		variantOf(brutus).ifPresent(variant -> session.onBrutusDamaged(variant, tick));
+		variantOf(brutus).ifPresent(session::onBrutusDamaged);
 	}
 
 	@Subscribe
@@ -132,8 +158,6 @@ public class BrutusTrackerPlugin extends Plugin
 		{
 			return;
 		}
-		int tick = client.getTickCount();
-		lastSeenTick = tick;
 		BrutusVariant variant = variantOf(brutus).orElse(null);
 		// Cleared so the despawn that follows the death is not mistaken for a mid-fight despawn.
 		brutus = null;
@@ -141,7 +165,7 @@ public class BrutusTrackerPlugin extends Plugin
 		{
 			return;
 		}
-		if (session.onBrutusDied(variant, tick))
+		if (session.onBrutusDied(variant))
 		{
 			configManager.setRSProfileConfiguration(
 				BrutusTrackerConfig.GROUP, variant.getPbConfigKey(), session.getPersonalBest(variant).getAsInt());
@@ -154,7 +178,20 @@ public class BrutusTrackerPlugin extends Plugin
 		if (brutus != null && event.getNpc() == brutus)
 		{
 			brutus = null;
-			session.onBrutusDespawnedAlive();
+			session.abandonFight();
+		}
+	}
+
+	private void adoptBrutusOnScreen()
+	{
+		for (NPC npc : client.getTopLevelWorldView().npcs())
+		{
+			if (BrutusVariant.fromNpcId(npc.getId()).isPresent())
+			{
+				brutus = npc;
+				session.markSeen();
+				return;
+			}
 		}
 	}
 

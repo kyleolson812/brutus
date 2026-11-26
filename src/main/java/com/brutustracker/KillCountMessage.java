@@ -7,7 +7,7 @@ import net.runelite.client.util.Text;
 
 final class KillCountMessage
 {
-	private static final Pattern KILL_COUNT = Pattern.compile("^Your (.+) kill count is: ?([0-9,]+)\\.?$");
+	private static final Pattern KILL_COUNT = Pattern.compile("^Your (.+) kill count is: ?([0-9][0-9,]*)\\.?$");
 
 	private final BrutusVariant variant;
 	private final int killCount;

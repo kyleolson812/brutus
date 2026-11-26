@@ -3,7 +3,6 @@ package com.brutustracker;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
 import javax.inject.Inject;
-import net.runelite.api.Client;
 import net.runelite.client.ui.overlay.OverlayPanel;
 import net.runelite.client.ui.overlay.OverlayPosition;
 import net.runelite.client.ui.overlay.components.LineComponent;
@@ -11,15 +10,13 @@ import net.runelite.client.ui.overlay.components.TitleComponent;
 
 class BrutusTrackerOverlay extends OverlayPanel
 {
-	private final Client client;
 	private final BrutusTrackerPlugin plugin;
 	private final BrutusTrackerConfig config;
 
 	@Inject
-	private BrutusTrackerOverlay(Client client, BrutusTrackerPlugin plugin, BrutusTrackerConfig config)
+	private BrutusTrackerOverlay(BrutusTrackerPlugin plugin, BrutusTrackerConfig config)
 	{
 		super(plugin);
-		this.client = client;
 		this.plugin = plugin;
 		this.config = config;
 		setPosition(OverlayPosition.TOP_LEFT);
@@ -34,7 +31,6 @@ class BrutusTrackerOverlay extends OverlayPanel
 		}
 
 		BrutusSession session = plugin.getSession();
-		int tick = client.getTickCount();
 		for (BrutusVariant variant : BrutusVariant.values())
 		{
 			int kills = session.getKills(variant);
@@ -47,7 +43,7 @@ class BrutusTrackerOverlay extends OverlayPanel
 			{
 				if (stat.visible(config))
 				{
-					addLine(stat.label(), stat.text(session, variant, tick));
+					addLine(stat.label(), stat.text(session, variant));
 				}
 			}
 		}

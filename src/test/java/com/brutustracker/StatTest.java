@@ -35,27 +35,31 @@ public class StatTest
 	public void textForKnownValues()
 	{
 		BrutusSession session = new BrutusSession();
-		session.onBrutusDamaged(VARIANT, 0);
-		session.onBrutusDied(VARIANT, 100);
+		session.onBrutusDamaged(VARIANT);
+		for (int i = 0; i < 100; i++)
+		{
+			session.onTick();
+		}
+		session.onBrutusDied(VARIANT);
 		session.setAllTimeKillCount(VARIANT, OptionalInt.of(42));
 		session.setPersonalBest(VARIANT, OptionalInt.of(80));
 
-		assertEquals("1", Stat.KILLS.text(session, VARIANT, 100));
-		assertEquals("42", Stat.ALL_TIME_KC.text(session, VARIANT, 100));
-		assertEquals("1:00.0", Stat.LAST_KILL.text(session, VARIANT, 100));
-		assertEquals("1:00.0", Stat.SESSION_BEST.text(session, VARIANT, 100));
-		assertEquals("0:48.0", Stat.PERSONAL_BEST.text(session, VARIANT, 100));
-		assertEquals("60.0", Stat.KILLS_PER_HOUR.text(session, VARIANT, 100));
+		assertEquals("1", Stat.KILLS.text(session, VARIANT));
+		assertEquals("42", Stat.ALL_TIME_KC.text(session, VARIANT));
+		assertEquals("1:00.0", Stat.LAST_KILL.text(session, VARIANT));
+		assertEquals("1:00.0", Stat.SESSION_BEST.text(session, VARIANT));
+		assertEquals("0:48.0", Stat.PERSONAL_BEST.text(session, VARIANT));
+		assertEquals("60.0", Stat.KILLS_PER_HOUR.text(session, VARIANT));
 	}
 
 	@Test
 	public void missingValuesShowDash()
 	{
 		BrutusSession session = new BrutusSession();
-		assertEquals("-", Stat.ALL_TIME_KC.text(session, VARIANT, 0));
-		assertEquals("-", Stat.LAST_KILL.text(session, VARIANT, 0));
-		assertEquals("-", Stat.SESSION_BEST.text(session, VARIANT, 0));
-		assertEquals("-", Stat.PERSONAL_BEST.text(session, VARIANT, 0));
+		assertEquals("-", Stat.ALL_TIME_KC.text(session, VARIANT));
+		assertEquals("-", Stat.LAST_KILL.text(session, VARIANT));
+		assertEquals("-", Stat.SESSION_BEST.text(session, VARIANT));
+		assertEquals("-", Stat.PERSONAL_BEST.text(session, VARIANT));
 	}
 
 	@Test

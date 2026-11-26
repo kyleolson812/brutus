@@ -6,22 +6,22 @@ import java.util.function.Predicate;
 enum Stat
 {
 	KILLS("Kills", BrutusTrackerConfig::showKills,
-		(session, variant, tick) -> Integer.toString(session.getKills(variant))),
+		(session, variant) -> Integer.toString(session.getKills(variant))),
 	ALL_TIME_KC("KC (all time)", BrutusTrackerConfig::showAllTimeKc,
-		(session, variant, tick) -> count(session.getAllTimeKillCount(variant))),
+		(session, variant) -> count(session.getAllTimeKillCount(variant))),
 	LAST_KILL("Last", BrutusTrackerConfig::showLastKill,
-		(session, variant, tick) -> time(session.getLastKillTicks(variant))),
+		(session, variant) -> time(session.getLastKillTicks(variant))),
 	SESSION_BEST("Best (session)", BrutusTrackerConfig::showSessionBest,
-		(session, variant, tick) -> time(session.getBestTicks(variant))),
+		(session, variant) -> time(session.getBestTicks(variant))),
 	PERSONAL_BEST("PB", BrutusTrackerConfig::showPersonalBest,
-		(session, variant, tick) -> time(session.getPersonalBest(variant))),
+		(session, variant) -> time(session.getPersonalBest(variant))),
 	KILLS_PER_HOUR("Kills/hr", BrutusTrackerConfig::showKillsPerHour,
-		(session, variant, tick) -> String.format("%.1f", session.getKillsPerHour(variant, tick)));
+		(session, variant) -> String.format("%.1f", session.getKillsPerHour(variant)));
 
 	@FunctionalInterface
 	interface ValueFormatter
 	{
-		String format(BrutusSession session, BrutusVariant variant, int tick);
+		String format(BrutusSession session, BrutusVariant variant);
 	}
 
 	static final String NO_VALUE = "-";
@@ -47,9 +47,9 @@ enum Stat
 		return enabled.test(config);
 	}
 
-	String text(BrutusSession session, BrutusVariant variant, int tick)
+	String text(BrutusSession session, BrutusVariant variant)
 	{
-		return formatter.format(session, variant, tick);
+		return formatter.format(session, variant);
 	}
 
 	static boolean anyVisible(BrutusTrackerConfig config)

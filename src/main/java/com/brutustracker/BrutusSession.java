@@ -8,7 +8,7 @@ public class BrutusSession
 {
 	private static final double SECONDS_PER_TICK = 0.6;
 	private static final double SECONDS_PER_HOUR = 3600;
-	private static final int NOT_STARTED = -1;
+	private static final int RECENT_TICKS = 100;
 
 	private static final class Fight
 	{
@@ -33,7 +33,9 @@ public class BrutusSession
 
 	private final Map<BrutusVariant, Stats> stats = new EnumMap<>(BrutusVariant.class);
 	private Fight fight;
-	private int sessionStartTick = NOT_STARTED;
+	private int clock;
+	private OptionalInt sessionStartTick = OptionalInt.empty();
+	private OptionalInt lastSeenTick = OptionalInt.empty();
 
 	public BrutusSession()
 	{
@@ -43,26 +45,44 @@ public class BrutusSession
 		}
 	}
 
-	public void onBrutusDamaged(BrutusVariant variant, int tick)
+	/** The session's own game-tick clock, so stored timestamps never depend on the client's tick counter. */
+	public void onTick()
 	{
-		startSessionIfNeeded(tick);
+		clock++;
+	}
+
+	public void markSeen()
+	{
+		lastSeenTick = OptionalInt.of(clock);
+	}
+
+	public boolean isRecentlyActive()
+	{
+		return fight != null || (lastSeenTick.isPresent() && clock - lastSeenTick.getAsInt() <= RECENT_TICKS);
+	}
+
+	public void onBrutusDamaged(BrutusVariant variant)
+	{
+		startSessionIfNeeded();
+		markSeen();
 		if (fight == null)
 		{
-			fight = new Fight(variant, tick);
+			fight = new Fight(variant, clock);
 		}
 	}
 
 	/**
 	 * @return true when this kill set a new all-time personal best
 	 */
-	public boolean onBrutusDied(BrutusVariant variant, int tick)
+	public boolean onBrutusDied(BrutusVariant variant)
 	{
-		startSessionIfNeeded(tick);
+		startSessionIfNeeded();
+		markSeen();
 		Stats s = stats.get(variant);
 		s.kills++;
 
 		boolean timed = fight != null && fight.variant == variant;
-		int duration = timed ? tick - fight.startTick : 0;
+		int duration = timed ? clock - fight.startTick : 0;
 		fight = null;
 
 		if (!timed)
@@ -84,7 +104,7 @@ public class BrutusSession
 		return false;
 	}
 
-	public void onBrutusDespawnedAlive()
+	public void abandonFight()
 	{
 		fight = null;
 	}
@@ -129,13 +149,13 @@ public class BrutusSession
 		return stats.get(variant).pbTicks;
 	}
 
-	public double getKillsPerHour(BrutusVariant variant, int currentTick)
+	public double getKillsPerHour(BrutusVariant variant)
 	{
-		if (sessionStartTick == NOT_STARTED)
+		if (!sessionStartTick.isPresent())
 		{
 			return 0;
 		}
-		int elapsedTicks = currentTick - sessionStartTick;
+		int elapsedTicks = clock - sessionStartTick.getAsInt();
 		if (elapsedTicks <= 0)
 		{
 			return 0;
@@ -143,11 +163,11 @@ public class BrutusSession
 		return stats.get(variant).kills / (elapsedTicks * SECONDS_PER_TICK / SECONDS_PER_HOUR);
 	}
 
-	private void startSessionIfNeeded(int tick)
+	private void startSessionIfNeeded()
 	{
-		if (sessionStartTick == NOT_STARTED)
+		if (!sessionStartTick.isPresent())
 		{
-			sessionStartTick = tick;
+			sessionStartTick = OptionalInt.of(clock);
 		}
 	}
 }

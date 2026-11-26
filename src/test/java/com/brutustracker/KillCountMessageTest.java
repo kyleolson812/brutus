@@ -32,6 +32,12 @@ public class KillCountMessageTest
 	}
 
 	@Test
+	public void commaOnlyCountIsIgnoredInsteadOfThrowing()
+	{
+		assertEquals(Optional.empty(), KillCountMessage.parse("Your Brutus kill count is: ,."));
+	}
+
+	@Test
 	public void ignoresOtherBosses()
 	{
 		assertEquals(Optional.empty(), KillCountMessage.parse("Your Giant Mole kill count is: 5."));

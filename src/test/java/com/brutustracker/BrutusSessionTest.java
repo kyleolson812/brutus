@@ -13,13 +13,23 @@ public class BrutusSessionTest
 	private static final BrutusVariant NORMAL = BrutusVariant.NORMAL;
 	private static final BrutusVariant DEMONIC = BrutusVariant.DEMONIC;
 
+	private static void tick(BrutusSession session, int ticks)
+	{
+		for (int i = 0; i < ticks; i++)
+		{
+			session.onTick();
+		}
+	}
+
 	@Test
 	public void killDurationIsDeathTickMinusFirstDamageTick()
 	{
 		BrutusSession session = new BrutusSession();
-		session.onBrutusDamaged(NORMAL, 100);
-		session.onBrutusDamaged(NORMAL, 110);
-		session.onBrutusDied(NORMAL, 150);
+		session.onBrutusDamaged(NORMAL);
+		tick(session, 10);
+		session.onBrutusDamaged(NORMAL);
+		tick(session, 40);
+		session.onBrutusDied(NORMAL);
 
 		assertEquals(1, session.getKills(NORMAL));
 		assertEquals(OptionalInt.of(50), session.getLastKillTicks(NORMAL));
@@ -30,12 +40,15 @@ public class BrutusSessionTest
 	public void variantsAreCountedSeparately()
 	{
 		BrutusSession session = new BrutusSession();
-		session.onBrutusDamaged(NORMAL, 0);
-		session.onBrutusDied(NORMAL, 40);
-		session.onBrutusDamaged(DEMONIC, 100);
-		session.onBrutusDied(DEMONIC, 180);
-		session.onBrutusDamaged(DEMONIC, 200);
-		session.onBrutusDied(DEMONIC, 250);
+		session.onBrutusDamaged(NORMAL);
+		tick(session, 40);
+		session.onBrutusDied(NORMAL);
+		session.onBrutusDamaged(DEMONIC);
+		tick(session, 80);
+		session.onBrutusDied(DEMONIC);
+		session.onBrutusDamaged(DEMONIC);
+		tick(session, 50);
+		session.onBrutusDied(DEMONIC);
 
 		assertEquals(1, session.getKills(NORMAL));
 		assertEquals(2, session.getKills(DEMONIC));
@@ -44,25 +57,42 @@ public class BrutusSessionTest
 	}
 
 	@Test
-	public void despawnMidFightDoesNotCountAndNextFightStartsFresh()
+	public void abandonedFightDoesNotCountAndNextFightStartsFresh()
 	{
 		BrutusSession session = new BrutusSession();
-		session.onBrutusDamaged(NORMAL, 0);
-		session.onBrutusDespawnedAlive();
+		session.onBrutusDamaged(NORMAL);
+		session.abandonFight();
 
 		assertEquals(0, session.getKills(NORMAL));
 		assertFalse(session.isFightInProgress());
 
-		session.onBrutusDamaged(NORMAL, 500);
-		session.onBrutusDied(NORMAL, 560);
+		tick(session, 500);
+		session.onBrutusDamaged(NORMAL);
+		tick(session, 60);
+		session.onBrutusDied(NORMAL);
 		assertEquals(OptionalInt.of(60), session.getLastKillTicks(NORMAL));
+	}
+
+	@Test
+	public void deathAfterLogoutOrHopRecordsNoDuration()
+	{
+		BrutusSession session = new BrutusSession();
+		session.onBrutusDamaged(NORMAL);
+		tick(session, 30);
+		session.abandonFight();
+		tick(session, 30);
+		assertFalse(session.onBrutusDied(NORMAL));
+
+		assertEquals(1, session.getKills(NORMAL));
+		assertFalse(session.getLastKillTicks(NORMAL).isPresent());
+		assertFalse(session.getPersonalBest(NORMAL).isPresent());
 	}
 
 	@Test
 	public void killWithoutAFightCountsButHasNoDuration()
 	{
 		BrutusSession session = new BrutusSession();
-		assertFalse(session.onBrutusDied(NORMAL, 10));
+		assertFalse(session.onBrutusDied(NORMAL));
 
 		assertEquals(1, session.getKills(NORMAL));
 		assertFalse(session.getLastKillTicks(NORMAL).isPresent());
@@ -73,8 +103,9 @@ public class BrutusSessionTest
 	public void killOfOtherVariantThanFightHasNoDuration()
 	{
 		BrutusSession session = new BrutusSession();
-		session.onBrutusDamaged(NORMAL, 0);
-		session.onBrutusDied(DEMONIC, 50);
+		session.onBrutusDamaged(NORMAL);
+		tick(session, 50);
+		session.onBrutusDied(DEMONIC);
 
 		assertEquals(1, session.getKills(DEMONIC));
 		assertFalse(session.getLastKillTicks(DEMONIC).isPresent());
@@ -85,9 +116,10 @@ public class BrutusSessionTest
 	public void firstTimedKillIsAPersonalBest()
 	{
 		BrutusSession session = new BrutusSession();
-		session.onBrutusDamaged(NORMAL, 0);
+		session.onBrutusDamaged(NORMAL);
+		tick(session, 70);
 
-		assertTrue(session.onBrutusDied(NORMAL, 70));
+		assertTrue(session.onBrutusDied(NORMAL));
 		assertEquals(OptionalInt.of(70), session.getPersonalBest(NORMAL));
 	}
 
@@ -97,12 +129,15 @@ public class BrutusSessionTest
 		BrutusSession session = new BrutusSession();
 		session.setPersonalBest(NORMAL, OptionalInt.of(60));
 
-		session.onBrutusDamaged(NORMAL, 0);
-		assertFalse(session.onBrutusDied(NORMAL, 60));
-		session.onBrutusDamaged(NORMAL, 100);
-		assertFalse(session.onBrutusDied(NORMAL, 170));
-		session.onBrutusDamaged(NORMAL, 200);
-		assertTrue(session.onBrutusDied(NORMAL, 255));
+		session.onBrutusDamaged(NORMAL);
+		tick(session, 60);
+		assertFalse(session.onBrutusDied(NORMAL));
+		session.onBrutusDamaged(NORMAL);
+		tick(session, 70);
+		assertFalse(session.onBrutusDied(NORMAL));
+		session.onBrutusDamaged(NORMAL);
+		tick(session, 55);
+		assertTrue(session.onBrutusDied(NORMAL));
 
 		assertEquals(OptionalInt.of(55), session.getPersonalBest(NORMAL));
 		assertEquals(OptionalInt.of(55), session.getBestTicks(NORMAL));
@@ -113,36 +148,71 @@ public class BrutusSessionTest
 	{
 		BrutusSession session = new BrutusSession();
 		session.setPersonalBest(NORMAL, OptionalInt.of(10));
-		session.onBrutusDamaged(NORMAL, 0);
-		session.onBrutusDied(NORMAL, 80);
+		session.onBrutusDamaged(NORMAL);
+		tick(session, 80);
+		session.onBrutusDied(NORMAL);
 
 		assertEquals(OptionalInt.of(80), session.getBestTicks(NORMAL));
 		assertEquals(OptionalInt.of(10), session.getPersonalBest(NORMAL));
 	}
 
 	@Test
-	public void killsPerHourUsesTimeSinceFirstDamage()
+	public void killsPerHourUsesSessionTicksSinceFirstDamage()
 	{
 		BrutusSession session = new BrutusSession();
-		session.onBrutusDamaged(NORMAL, 1000);
-		session.onBrutusDied(NORMAL, 1050);
-		session.onBrutusDamaged(NORMAL, 1100);
-		session.onBrutusDied(NORMAL, 1150);
+		tick(session, 1000);
+		session.onBrutusDamaged(NORMAL);
+		tick(session, 50);
+		session.onBrutusDied(NORMAL);
+		session.onBrutusDamaged(NORMAL);
+		tick(session, 50);
+		session.onBrutusDied(NORMAL);
+		tick(session, 5900);
 
-		// 6000 ticks = 1 hour
-		assertEquals(2.0, session.getKillsPerHour(NORMAL, 7000), 1e-9);
-		assertEquals(0.0, session.getKillsPerHour(DEMONIC, 7000), 1e-9);
+		// 6000 ticks since first damage = 1 hour
+		assertEquals(2.0, session.getKillsPerHour(NORMAL), 1e-9);
+		assertEquals(0.0, session.getKillsPerHour(DEMONIC), 1e-9);
 	}
 
 	@Test
 	public void killsPerHourIsZeroWithNoElapsedTime()
 	{
 		BrutusSession session = new BrutusSession();
-		assertEquals(0.0, session.getKillsPerHour(NORMAL, 500), 1e-9);
+		tick(session, 500);
+		assertEquals(0.0, session.getKillsPerHour(NORMAL), 1e-9);
 
-		session.onBrutusDamaged(NORMAL, 500);
-		session.onBrutusDied(NORMAL, 500);
-		assertEquals(0.0, session.getKillsPerHour(NORMAL, 500), 1e-9);
+		session.onBrutusDamaged(NORMAL);
+		session.onBrutusDied(NORMAL);
+		assertEquals(0.0, session.getKillsPerHour(NORMAL), 1e-9);
+	}
+
+	@Test
+	public void neverSeenIsNotRecentlyActive()
+	{
+		BrutusSession session = new BrutusSession();
+		assertFalse(session.isRecentlyActive());
+		tick(session, 1_000_000);
+		assertFalse(session.isRecentlyActive());
+	}
+
+	@Test
+	public void seenIsRecentOnlyWithinOneHundredTicks()
+	{
+		BrutusSession session = new BrutusSession();
+		session.markSeen();
+		tick(session, 100);
+		assertTrue(session.isRecentlyActive());
+		tick(session, 1);
+		assertFalse(session.isRecentlyActive());
+	}
+
+	@Test
+	public void fightInProgressIsActiveRegardlessOfLastSeen()
+	{
+		BrutusSession session = new BrutusSession();
+		session.onBrutusDamaged(NORMAL);
+		tick(session, 500);
+		assertTrue(session.isRecentlyActive());
 	}
 
 	@Test
@@ -160,8 +230,9 @@ public class BrutusSessionTest
 		assertEquals(OptionalInt.empty(), session.getAllTimeKillCount(NORMAL));
 
 		session.setAllTimeKillCount(NORMAL, OptionalInt.of(10));
-		session.onBrutusDamaged(NORMAL, 0);
-		session.onBrutusDied(NORMAL, 40);
+		session.onBrutusDamaged(NORMAL);
+		tick(session, 40);
+		session.onBrutusDied(NORMAL);
 		assertEquals(OptionalInt.of(10), session.getAllTimeKillCount(NORMAL));
 
 		session.setAllTimeKillCount(NORMAL, OptionalInt.of(11));
